@@ -55,7 +55,9 @@ rc-monitor/
     RcMonitor.java               Java wrapper with RcState class
     UsbRcReader.java             Android USB Host API integration
   test/
-    test_rc_monitor.c            Unit tests
+    test_rc_monitor.c            Unit tests (32 tests)
+    fuzz_feed.c                  libFuzzer harness for rcm_feed()
+    fuzz_payload.c               libFuzzer harness for rcm_parse_payload()
 ```
 
 ## Integration into an Android app
@@ -208,6 +210,25 @@ cd rc-monitor
 mkdir build && cd build
 cmake .. && make
 ./test_rc_monitor
+```
+
+### With sanitizers (ASan + UBSan)
+
+Requires clang:
+
+```sh
+CC=clang cmake .. -DENABLE_SANITIZERS=ON && make
+./test_rc_monitor
+```
+
+### Fuzz testing
+
+Requires a compiler with libFuzzer support (e.g. clang):
+
+```sh
+CC=clang cmake .. -DENABLE_FUZZING=ON && make
+./fuzz_feed -max_total_time=60
+./fuzz_payload -max_total_time=60
 ```
 
 ## Payload format reference
