@@ -22,6 +22,12 @@ typedef struct {
     jmethodID    on_state_mid;   /* Cached method ID */
 } jni_ctx_t;
 
+/*
+ * Global singleton context. Not protected by a mutex — concurrent calls to
+ * nativeInit()/nativeDestroy() from different threads would race. In practice,
+ * the Java RcMonitor class is used as a singleton from a single thread and
+ * UsbRcReader manages the lifecycle, so this is acceptable.
+ */
 static jni_ctx_t *g_ctx = NULL;
 
 /* Called from the C parser when an RC push packet is decoded */

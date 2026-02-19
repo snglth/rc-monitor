@@ -125,7 +125,14 @@ int rcm_parse_payload(const uint8_t *payload, size_t len, rc_state_t *out) {
     out->left_wheel  = (int16_t)(read_u16_le(payload + 13) - 0x400);
     out->right_wheel = (int16_t)(read_u16_le(payload + 15) - 0x400);
 
-    /* Right new wheel: 5-bit magnitude with sign bit */
+    /*
+     * Right wheel delta: 5-bit magnitude (bits 5:1) with sign bit (bit 6).
+     * Reverse-engineered convention: sign=1 → positive, sign=0 → negative.
+     * This is the opposite of the typical sign-bit convention. The Ghidra
+     * decompilation of UpdateRightWheel only covers wheel position (value -
+     * 0x400), not this delta encoding, so the sign polarity has not been
+     * independently verified against hardware.
+     */
     int mag  = (b4 >> 1) & 0x1F;
     int sign = (b4 >> 6) & 1;
     out->right_wheel_delta = (int8_t)(sign ? mag : -mag);
@@ -161,6 +168,7 @@ rcm_parser_t *rcm_create(rcm_callback_t cb, void *userdata) {
 }
 
 void rcm_destroy(rcm_parser_t *p) {
+    if (!p) return;
     free(p);
 }
 
@@ -275,8 +283,6 @@ static int try_decode_frame(rcm_parser_t *p) {
              * Note: the exact header layout can vary between DUML versions.
              * We search for cmd_set=0x06 at multiple possible offsets.
              */
-            int rc_decoded = 0;
-
             /* Try standard DUML v1 offsets */
             if (p->frame_len >= 13) {
                 uint8_t cmd_set = frame[9];
@@ -298,13 +304,14 @@ static int try_decode_frame(rcm_parser_t *p) {
              * DUML v2/v3 may have a slightly different header.
              * Try scanning for the RC cmd_set/cmd_id pair in bytes 8-12.
              */
-            if (!rc_decoded && p->frame_len >= 14) {
+            if (p->frame_len >= 14) {
                 for (int off = 8; off <= 12 && off + 2 + RC_PUSH_PAYLOAD_LEN <= (int)p->frame_len - 2; off++) {
                     if (frame[off] == DUML_CMD_SET_RC && frame[off + 1] == DUML_CMD_RC_PUSH) {
                         rc_state_t state;
                         size_t payload_off = off + 2;
                         size_t payload_len = p->frame_len - 2 - payload_off;
                         if (payload_len >= RC_PUSH_PAYLOAD_LEN &&
+                            payload_len <= RC_PUSH_PAYLOAD_LEN + 4 &&
                             rcm_parse_payload(frame + payload_off, payload_len, &state) == 0) {
                             p->callback(&state, p->userdata);
                             return 1;
