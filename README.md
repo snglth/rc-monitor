@@ -54,8 +54,11 @@ rc-monitor/
   java/com/dji/rcmonitor/
     RcMonitor.java               Java wrapper with RcState class
     UsbRcReader.java             Android USB Host API integration
+  emulator/
+    rc_emulator.c                Interactive ncurses RC emulator
   test/
     test_rc_monitor.c            Unit tests (32 tests)
+    verify_recording.c           Recording round-trip verifier
     fuzz_feed.c                  libFuzzer harness for rcm_feed()
     fuzz_payload.c               libFuzzer harness for rcm_parse_payload()
 ```
@@ -230,6 +233,44 @@ CC=clang cmake .. -DENABLE_FUZZING=ON && make
 ./fuzz_feed -max_total_time=60
 ./fuzz_payload -max_total_time=60
 ```
+
+## RC Emulator
+
+An interactive terminal tool that exercises the full parsing pipeline without physical hardware. It maps keyboard and mouse input to virtual RC state, builds DUML frames, and feeds them through the parser — the displayed values come from the parser callback, proving the round-trip works.
+
+```sh
+./rc_emulator              # interactive mode
+./rc_emulator -o rec.bin   # record DUML frames to file
+```
+
+### Controls
+
+| Input | Control | Behavior |
+|-------|---------|----------|
+| `WASD` | Left stick | Hold-to-deflect, decays to center |
+| Arrow keys | Right stick | Hold-to-deflect, decays to center |
+| Mouse drag | Either stick | Click-drag inside stick box |
+| `p h z x` | Pause/Home/Shutter/Record | Momentary (1 tick) |
+| `1 2 3` | Custom C1/C2/C3 | Momentary |
+| `i k j l o` | 5D Up/Down/Left/Right/Center | Momentary |
+| `[ ] \` | Sport/Normal/Tripod mode | Latching |
+| `- =` | Left wheel dec/inc | Holds position |
+| `9 0` | Right wheel dec/inc | Holds position |
+| `, .` | Right wheel delta -/+ | Momentary per-tick |
+| Scroll wheel | Left wheel | Mouse scroll up/down |
+| Click buttons | Button/5D/Mode labels | Activate on click |
+| `r` | Reset all | Instant |
+| `q` | Quit | — |
+
+### Verifying recordings
+
+Feed a recorded `.bin` file back through the parser to confirm every frame decodes correctly:
+
+```sh
+./verify_recording rec.bin
+```
+
+This prints each decoded `rc_state_t` with stick positions, button state, flight mode, and wheel values.
 
 ## Payload format reference
 

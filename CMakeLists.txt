@@ -48,6 +48,30 @@ else()
         target_link_libraries(test_rc_monitor rc_monitor_static)
     endif()
 
+    # RC Emulator (interactive testing tool)
+    if(EXISTS ${CMAKE_SOURCE_DIR}/emulator/rc_emulator.c)
+        add_executable(rc_emulator emulator/rc_emulator.c)
+        target_link_libraries(rc_emulator rc_monitor_static)
+        # Relax -Wpedantic for ncurses system headers (macOS SDK has extra
+        # semicolons that trip -Wpedantic, and _string.h uses 'defined' in
+        # macro expansion which trips -Wexpansion-to-defined).
+        target_compile_options(rc_emulator PRIVATE
+            -Wno-pedantic -Wno-expansion-to-defined)
+        find_package(Curses)
+        if(CURSES_FOUND)
+            target_include_directories(rc_emulator PRIVATE ${CURSES_INCLUDE_DIRS})
+            target_link_libraries(rc_emulator ${CURSES_LIBRARIES})
+        else()
+            target_link_libraries(rc_emulator ncurses)
+        endif()
+    endif()
+
+    # Recording verification tool
+    if(EXISTS ${CMAKE_SOURCE_DIR}/test/verify_recording.c)
+        add_executable(verify_recording test/verify_recording.c)
+        target_link_libraries(verify_recording rc_monitor_static)
+    endif()
+
     # Fuzz targets (requires clang with libFuzzer support)
     option(ENABLE_FUZZING "Enable libFuzzer targets" OFF)
     if(ENABLE_FUZZING)
