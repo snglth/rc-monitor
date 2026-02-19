@@ -53,7 +53,12 @@ rc-monitor/
     rc_monitor_jni.c             Android JNI bridge
   java/com/dji/rcmonitor/
     RcMonitor.java               Java wrapper with RcState class
-    UsbRcReader.java             Android USB Host API integration
+    RcReader.java                Swappable data source interface
+    RcReaderChain.java           Priority-based reader selector
+    UsbRcReader.java             USB Host API reader (external RC)
+    DussStreamReader.java        DUSS Interface 7 reader (on-device)
+    LocalSocketReader.java       Unix domain socket reader (root)
+    InputEventReader.java        /dev/input/event* reader (root)
   emulator/
     rc_emulator.c                Interactive ncurses RC emulator
   test/
@@ -92,7 +97,12 @@ Copy the contents of `java/` into your app's `src/main/java/` directory so that 
 ```
 app/src/main/java/com/dji/rcmonitor/
   RcMonitor.java
+  RcReader.java
+  RcReaderChain.java
   UsbRcReader.java
+  DussStreamReader.java
+  LocalSocketReader.java
+  InputEventReader.java
 ```
 
 ### 3. Declare USB permissions in AndroidManifest.xml
@@ -125,12 +135,19 @@ Create `res/xml/usb_device_filter.xml`:
 
 ### 4. Use it
 
-#### Option A: UsbRcReader (handles USB automatically)
+#### Option A: RcReaderChain (auto-selects best data source)
+
+`RcReaderChain` tries each reader in priority order and activates the first one whose data source is reachable and starts successfully. This is the recommended approach when your app may run on both external phones (USB) and on the controller itself (RM510B):
 
 ```java
-UsbRcReader reader = new UsbRcReader(context);
+RcReaderChain chain = new RcReaderChain(
+    new DussStreamReader(context),
+    new LocalSocketReader(context, "/dev/socket/dji_xxx"),
+    new InputEventReader(context),
+    new UsbRcReader(context)
+);
 
-reader.start(new RcMonitor.SimpleListener() {
+RcMonitor.SimpleListener listener = new RcMonitor.SimpleListener() {
     @Override
     public void onState(RcMonitor.RcState s) {
         Log.d("RC", String.format(
@@ -139,15 +156,37 @@ reader.start(new RcMonitor.SimpleListener() {
             s.stickRightH, s.stickRightV,
             s.stickLeftH, s.stickLeftV));
     }
-});
+};
+
+RcReader active = chain.start(listener);
+if (active != null) {
+    Log.i("RC", "Reading from: " + active.getName());
+}
+
+// Inspect all reader states:
+for (Map<String, Object> entry : chain.status()) {
+    Log.d("RC", entry.get("name") + " available=" + entry.get("available")
+                                   + " active=" + entry.get("active"));
+}
 
 // When done:
+chain.stop();
+```
+
+#### Option B: Single reader directly
+
+Every reader implements the `RcReader` interface (`start`, `stop`, `isRunning`, `isAvailable`, `getName`), so you can also use one directly:
+
+```java
+UsbRcReader reader = new UsbRcReader(context);
+reader.start(listener);
+// ...
 reader.stop();
 ```
 
-The listener callback fires on the USB reader thread. Post to a `Handler` or use `runOnUiThread()` if you need to update UI.
+The listener callback fires on the reader's background thread. Post to a `Handler` or use `runOnUiThread()` if you need to update UI.
 
-#### Option B: Manual USB reads with RcMonitor
+#### Option C: Manual USB reads with RcMonitor
 
 If you need more control over the USB connection (permissions, device selection, error handling):
 
@@ -172,7 +211,7 @@ while (running) {
 monitor.destroy();
 ```
 
-#### Option C: Direct payload parsing
+#### Option D: Direct payload parsing
 
 If you already have the raw 17-byte RC push payload from another source, bypass the DUML framing entirely:
 
@@ -180,6 +219,71 @@ If you already have the raw 17-byte RC push payload from another source, bypass 
 // payload is a 17-byte array extracted from a DUML frame
 monitor.feedDirect(payload, payload.length);
 ```
+
+## Swappable reader interface
+
+### Rationale
+
+The original `UsbRcReader` assumes the app runs on an external phone connected to the RC via USB. On the RM510B (where the app runs directly on the controller), `dji_link` owns the USB interfaces that carry DUML data, so the USB Host API approach fails.
+
+Ghidra analysis of `libdjisdk_jni.so` shows the official SDK accesses RC data via Android Binder IPC to a DJI system service — not direct socket access. Without root, the Unix domain sockets under `/dev/socket/` are inaccessible from app space. There is no single transport that works everywhere.
+
+The `RcReader` interface decouples data source from parsing. The DUML parser (`rcm_feed`/`rcm_parse_payload`) and JNI bridge are shared by all readers; only the byte source changes.
+
+### Architecture
+
+```
+                        ┌──────────────┐
+                        │  RcReader    │ ← interface
+                        │  interface   │
+                        └──────┬───────┘
+           ┌───────────┬───────┼───────────┬───────────────┐
+           │           │       │           │               │
+     ┌─────┴─────┐ ┌───┴───┐ ┌┴────────┐ ┌┴────────────┐ │
+     │UsbRcReader│ │ Duss  │ │ Local   │ │ InputEvent  │ │
+     │ (USB Host)│ │Stream │ │ Socket  │ │ Reader      │ │
+     │           │ │Reader │ │ Reader  │ │ (/dev/input)│ │
+     └─────┬─────┘ └───┬───┘ └┬────────┘ └┬────────────┘ │
+           │           │      │           │               │
+           ▼           ▼      ▼           ▼               │
+      RcMonitor.feed()   RcMonitor.feed() RcMonitor       │
+      (DUML frames)      (DUML frames)   .feedDirect()    │
+           │           │      │           (raw 17B        │
+           └───────┬───┘──────┘           payload)        │
+                   ▼                          │           │
+             DUML parser                      │           │
+             (ring buf + CRC)                 │           │
+                   │                          │           │
+                   └──────────┬───────────────┘           │
+                              ▼                           │
+                       rcm_parse_payload()                │
+                              │                           │
+                              ▼                           │
+                       rc_state_t → callback              │
+                                                          │
+                                              ┌───────────┴──┐
+                                              │ RcReaderChain │
+                                              │ (priority     │
+                                              │  selector)    │
+                                              └──────────────┘
+```
+
+### Reader implementations
+
+| Reader | Transport | Data path | Root | Best for |
+|--------|-----------|-----------|------|----------|
+| `UsbRcReader` | USB Host API (bulk IN/OUT) | `feed()` (DUML) | No | External phone → RC |
+| `DussStreamReader` | USB Interface 7 (bulk IN) | `feed()` (DUML) | No | On-device (RM510B) |
+| `LocalSocketReader` | Unix domain socket | `feed()` (DUML) | Yes | On-device with root |
+| `InputEventReader` | `/dev/input/event*` | `feedDirect()` (raw 17B) | Yes | Sticks only, partial |
+
+**DussStreamReader** targets USB Interface 7 on the RM510B, which streams DUML data freely at ~20KB/s when `dji_link` owns the CDC ACM interfaces. No handshake or enable command needed. The DUML parser's CRC validation filters any non-RC noise. Logs periodic hex samples to logcat under the `DussStreamReader` tag for diagnostics.
+
+**LocalSocketReader** connects to a configurable Unix domain socket path (e.g. `/dev/socket/dji_xxx`). The socket path must be discovered on-device — it varies by firmware version. Requires root because `/dev/socket/` has restrictive permissions.
+
+**InputEventReader** reads `struct input_event` (24 bytes on arm64) from `/dev/input/event*` and maps `EV_ABS` axis events to stick values. On each `EV_SYN`, it synthesizes a 17-byte payload and calls `feedDirect()`. Only provides analog stick data — no buttons, wheels, or flight mode switch (those travel over DUML, not evdev). Raw input values are mapped to rc-monitor's centered-at-0 range (~-660..+660) using a configurable scale factor (default assumes ±32768).
+
+**RcReaderChain** is a convenience class that tries readers in priority order. Call `start(listener)` and it iterates through readers, calling `isAvailable()` then `start()` on each until one succeeds. `status()` returns the availability and active state of every reader in the chain.
 
 ## C API
 

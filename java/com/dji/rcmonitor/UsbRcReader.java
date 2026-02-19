@@ -33,7 +33,7 @@ import android.util.Log;
  *   reader.stop();
  * </pre>
  */
-public class UsbRcReader {
+public class UsbRcReader implements RcReader {
     private static final String TAG = "UsbRcReader";
     private static final int READ_TIMEOUT_MS = 100;
     private static final int BUFFER_SIZE = 1024;
@@ -160,6 +160,7 @@ public class UsbRcReader {
      * @param listener Callback for RC state updates (called on the read thread)
      * @return true if started successfully
      */
+    @Override
     public boolean start(RcMonitor.RcStateListener listener) {
         if (running) return false;
 
@@ -281,6 +282,7 @@ public class UsbRcReader {
     /**
      * Stop reading and release USB resources.
      */
+    @Override
     public void stop() {
         running = false;
         if (readThread != null) {
@@ -293,7 +295,18 @@ public class UsbRcReader {
         }
     }
 
+    @Override
     public boolean isRunning() {
         return running;
+    }
+
+    @Override
+    public String getName() {
+        return "USB";
+    }
+
+    @Override
+    public boolean isAvailable() {
+        return findDjiDevice() != null;
     }
 }

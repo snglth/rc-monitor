@@ -63,7 +63,12 @@ Singleton `jni_ctx_t` holds the parser, JavaVM reference, listener global ref, a
 ### Java Layer (`java/com/dji/rcmonitor/`)
 
 - **RcMonitor.java**: Wraps native methods. `SimpleListener` adapter packs the 20 callback parameters into an `RcState` object for convenience.
-- **UsbRcReader.java**: Full USB lifecycle — device discovery by VID/PID, CDC ACM setup (115200 8N1, DTR+RTS), DUML handshake (enable cmd), background read loop with automatic fallback to polling if push data stops after 2 seconds.
+- **RcReader.java**: Interface (`getName`, `start`, `stop`, `isRunning`, `isAvailable`) implemented by all readers below.
+- **UsbRcReader.java**: Full USB lifecycle — device discovery by VID/PID, CDC ACM setup (115200 8N1, DTR+RTS), DUML handshake (enable cmd), background read loop with automatic fallback to polling if push data stops after 2 seconds. Implements `RcReader`.
+- **DussStreamReader.java**: Opens USB Interface 7 (DUSS stream on RM510B), reads bulk IN into `RcMonitor.feed()`. Periodic hex logging to logcat. No handshake required.
+- **LocalSocketReader.java**: Connects to a configurable Unix domain socket path via `LocalSocket`, reads stream into `RcMonitor.feed()`. Root required.
+- **InputEventReader.java**: Reads `/dev/input/event*`, parses `struct input_event` (24B arm64), maps `EV_ABS` axes to sticks, synthesizes 17-byte payloads on `EV_SYN` via `RcMonitor.feedDirect()`. Configurable scale factor. Sticks only — no buttons.
+- **RcReaderChain.java**: Tries readers in priority order, activates the first that starts. `status()` returns availability/active state of all readers.
 
 ### Tests (`test/test_rc_monitor.c`)
 
