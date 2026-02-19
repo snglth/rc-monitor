@@ -1,12 +1,12 @@
 # rc-monitor
 
-Lightweight C library for monitoring DJI remote controller inputs on Android without the full DJI Mobile SDK. Parses raw USB data from RM510-series controllers (RC-N1, RC-N2, DJI RC) into structured button, stick, and wheel state.
+Self-contained C library for monitoring DJI remote controller inputs on Android. Handles USB enumeration, CDC ACM setup, DUML handshake, and parses raw USB data from RM510-series controllers (RC-N1, RC-N2, DJI RC) into structured button, stick, and wheel state.
 
 The protocol format was reverse-engineered from `libdjisdk_jni.so` in DJI Mobile SDK V5 5.17.0 using Ghidra. See `RC_MONITORING_SPEC.md` in the parent directory for the full reverse-engineering notes.
 
 ## What it parses
 
-All data comes from a single DJI DUML protocol push packet (`cmd_set=0x06`, `cmd_id=0x05`). The library decodes the 17-byte payload into:
+The RC streams DJI DUML protocol push packets (`cmd_set=0x06`, `cmd_id=0x05`) once the handshake is complete. The library decodes the 17-byte payload into:
 
 | Input                | Type    | Range / Values                     |
 |----------------------|---------|------------------------------------|
@@ -22,6 +22,24 @@ All data comes from a single DJI DUML protocol push packet (`cmd_set=0x06`, `cmd
 | Left wheel/dial      | int     | centered at 0                      |
 | Right wheel/dial     | int     | centered at 0                      |
 | Right wheel delta    | int     | signed incremental, -31 to +31     |
+
+## Handshake
+
+The RM510-series RC requires a DUML enable command before it starts streaming push data over USB. The sequence is:
+
+1. The RC enumerates as a CDC ACM USB device (VID `0x2CA3`, PID `0x1020`).
+2. The host configures the serial line: 115200 baud, 8N1, DTR+RTS asserted.
+3. An enable command is sent: `cmd_set=0x06`, `cmd_id=0x24`, `payload=[0x01]`.
+4. The RC begins streaming push data (`cmd_set=0x06`, `cmd_id=0x05`).
+
+`UsbRcReader` handles this automatically. For manual integration, build and send the enable command yourself:
+
+```java
+byte[] cmd = RcMonitor.buildEnableCommand(sequenceNumber);
+usbConnection.bulkTransfer(bulkOutEndpoint, cmd, cmd.length, 1000);
+```
+
+If no push data arrives, stick data can be polled with `RcMonitor.buildChannelRequest(seq)` sent periodically via bulk OUT.
 
 ## Project structure
 
@@ -149,12 +167,12 @@ while (running) {
 monitor.destroy();
 ```
 
-#### Option C: Direct payload parsing (with DJI SDK)
+#### Option C: Direct payload parsing
 
-If you already use the DJI SDK and want this library only for payload parsing, bypass the DUML framing entirely. Pass the raw push data bytes from a native hook or intercepted callback:
+If you already have the raw 17-byte RC push payload from another source, bypass the DUML framing entirely:
 
 ```java
-// payload is a 17-byte array from the DJI SDK's internal push data
+// payload is a 17-byte array extracted from a DUML frame
 monitor.feedDirect(payload, payload.length);
 ```
 
@@ -225,6 +243,5 @@ Bytes 5-16: Analog values (uint16 LE, subtract 0x400 to center)
 
 ## Limitations
 
-- The raw USB approach bypasses DJI's authentication handshake. The RM510 may require a DUML session to be established before it streams push data. If no data arrives, you may need to send an initial handshake sequence or use the DJI SDK for connection setup while using this library just for parsing.
-- The DUML CRC seeds and frame layout are based on DUML v1. The V5 SDK may use a slightly different framing version; the parser tries multiple header offsets to account for this.
 - Tested against the RM510 payload format. Other RC models (RC701/DJI RC Pro, RM700/RC-Plus) use the same push packet layout based on the shared `OnButtonPhysicalStatusPush` handler, but hardware-specific fields (e.g. which custom buttons physically exist) vary.
+- The RC enumerates with PID `0x0040` initially, then re-enumerates as PID `0x1020` once active. Your USB device filter should match both, or at minimum the DJI vendor ID `0x2CA3`.

@@ -177,13 +177,39 @@ public class RcMonitor {
         }
     }
 
+    /* --- Packet builders (static, no init required) --- */
+
+    /**
+     * Build the DUML enable/handshake command.
+     * Send this to the RC via bulk OUT to start push data streaming.
+     * @param seq Sequence number
+     * @return Ready-to-send byte array, or null on error
+     */
+    public static byte[] buildEnableCommand(int seq) {
+        return nativeBuildEnableCmd(seq);
+    }
+
+    /**
+     * Build a channel data request command.
+     * Send this to the RC via bulk OUT to poll for stick/button state.
+     * @param seq Sequence number
+     * @return Ready-to-send byte array, or null on error
+     */
+    public static byte[] buildChannelRequest(int seq) {
+        return nativeBuildChannelRequest(seq);
+    }
+
     /* --- Native methods --- */
     private native boolean nativeInit(RcStateListener listener);
     private native int nativeFeed(byte[] data, int length);
     private native int nativeFeedDirect(byte[] payload, int length);
     private native void nativeReset();
     private native void nativeDestroy();
+    private static native byte[] nativeBuildEnableCmd(int seq);
+    private static native byte[] nativeBuildChannelRequest(int seq);
 
     /* --- DJI USB constants --- */
     public static final int DJI_USB_VID = 0x2CA3;
+    public static final int DJI_USB_PID_INIT = 0x0040;
+    public static final int DJI_USB_PID_ACTIVE = 0x1020;
 }

@@ -208,3 +208,41 @@ Java_com_dji_rcmonitor_RcMonitor_nativeDestroy(JNIEnv *env, jobject thiz) {
     g_ctx = NULL;
     LOGD("RC Monitor destroyed");
 }
+
+/*
+ * Class:     com_dji_rcmonitor_RcMonitor
+ * Method:    nativeBuildEnableCmd
+ * Signature: (I)[B
+ *
+ * Build a DUML enable command packet. Does not require the parser to be initialized.
+ */
+JNIEXPORT jbyteArray JNICALL
+Java_com_dji_rcmonitor_RcMonitor_nativeBuildEnableCmd(JNIEnv *env, jclass clazz, jint seq) {
+    uint8_t buf[DUML_MAX_FRAME_LEN];
+    int len = rcm_build_enable_cmd(buf, sizeof(buf), (uint16_t)seq);
+    if (len < 0) return NULL;
+
+    jbyteArray result = (*env)->NewByteArray(env, len);
+    if (result)
+        (*env)->SetByteArrayRegion(env, result, 0, len, (const jbyte *)buf);
+    return result;
+}
+
+/*
+ * Class:     com_dji_rcmonitor_RcMonitor
+ * Method:    nativeBuildChannelRequest
+ * Signature: (I)[B
+ *
+ * Build a DUML channel data request packet. Does not require the parser to be initialized.
+ */
+JNIEXPORT jbyteArray JNICALL
+Java_com_dji_rcmonitor_RcMonitor_nativeBuildChannelRequest(JNIEnv *env, jclass clazz, jint seq) {
+    uint8_t buf[DUML_MAX_FRAME_LEN];
+    int len = rcm_build_channel_request(buf, sizeof(buf), (uint16_t)seq);
+    if (len < 0) return NULL;
+
+    jbyteArray result = (*env)->NewByteArray(env, len);
+    if (result)
+        (*env)->SetByteArrayRegion(env, result, 0, len, (const jbyte *)buf);
+    return result;
+}

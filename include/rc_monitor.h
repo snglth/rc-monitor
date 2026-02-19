@@ -24,13 +24,37 @@ extern "C" {
 #define DUML_SOF              0x55
 #define DUML_CMD_SET_RC       0x06
 #define DUML_CMD_RC_PUSH      0x05
+#define DUML_VERSION          1
+#define DUML_HEADER_LEN       11
+#define DUML_FOOTER_LEN       2
 #define DUML_MIN_FRAME_LEN    13    /* SOF(1)+LenVer(2)+CRC8(1)+Route(3)+Cmd(2)+Type(1)+CRC16(2)+payload(1+) */
 #define DUML_MAX_FRAME_LEN    1400
 
 #define RC_PUSH_PAYLOAD_LEN   17
 
+/* Device types */
+#define DUML_DEV_ANY          0
+#define DUML_DEV_CAMERA       1
+#define DUML_DEV_APP          2
+#define DUML_DEV_FC           3
+#define DUML_DEV_GIMBAL       4
+#define DUML_DEV_RC           6
+#define DUML_DEV_PC           10
+
+/* RC command IDs */
+#define DUML_CMD_RC_CHANNEL   0x01
+#define DUML_CMD_RC_ENABLE    0x24
+
+/* Pack/ack types */
+#define DUML_PACK_REQUEST     0
+#define DUML_PACK_RESPONSE    1
+#define DUML_ACK_NO_ACK       0
+#define DUML_ACK_AFTER_EXEC   2
+
 /* DJI USB Vendor/Product IDs */
 #define DJI_USB_VID           0x2CA3
+#define DJI_USB_PID_INIT      0x0040
+#define DJI_USB_PID_ACTIVE    0x1020
 
 /* --- RC State Structures --- */
 
@@ -150,6 +174,54 @@ int rcm_parse_payload(const uint8_t *payload, size_t len, rc_state_t *out);
  * Return a human-readable name for a flight mode value.
  */
 const char *rcm_flight_mode_str(rc_flight_mode_t mode);
+
+/* --- Packet Builder --- */
+
+/*
+ * Build a DUML v1 packet.
+ * @param out         Output buffer
+ * @param out_size    Size of output buffer
+ * @param sender_type   Device type of sender (e.g. DUML_DEV_PC)
+ * @param sender_index  Sender index (usually 0)
+ * @param receiver_type Device type of receiver (e.g. DUML_DEV_RC)
+ * @param receiver_index Receiver index (usually 0)
+ * @param seq_num     Sequence number
+ * @param pack_type   Pack type (DUML_PACK_REQUEST or DUML_PACK_RESPONSE)
+ * @param ack_type    Ack type (DUML_ACK_NO_ACK or DUML_ACK_AFTER_EXEC)
+ * @param encrypt_type Encryption type (usually 0)
+ * @param cmd_set     Command set
+ * @param cmd_id      Command ID
+ * @param payload     Payload bytes (may be NULL if payload_len is 0)
+ * @param payload_len Payload length
+ * @return Total packet size, or -1 on error
+ */
+int rcm_build_packet(uint8_t *out, size_t out_size,
+                     uint8_t sender_type, uint8_t sender_index,
+                     uint8_t receiver_type, uint8_t receiver_index,
+                     uint16_t seq_num,
+                     uint8_t pack_type, uint8_t ack_type, uint8_t encrypt_type,
+                     uint8_t cmd_set, uint8_t cmd_id,
+                     const uint8_t *payload, size_t payload_len);
+
+/*
+ * Build the RC enable/handshake command (cmd_set=0x06, cmd_id=0x24).
+ * Sender=PC/0, Receiver=RC/0, ack=ACK_AFTER_EXEC, payload=[0x01].
+ * @param out       Output buffer (must be >= 14 bytes)
+ * @param out_size  Size of output buffer
+ * @param seq       Sequence number
+ * @return Total packet size (14), or -1 on error
+ */
+int rcm_build_enable_cmd(uint8_t *out, size_t out_size, uint16_t seq);
+
+/*
+ * Build a channel data request (cmd_set=0x06, cmd_id=0x01).
+ * Sender=PC/0, Receiver=RC/0, ack=ACK_AFTER_EXEC, no payload.
+ * @param out       Output buffer (must be >= 13 bytes)
+ * @param out_size  Size of output buffer
+ * @param seq       Sequence number
+ * @return Total packet size (13), or -1 on error
+ */
+int rcm_build_channel_request(uint8_t *out, size_t out_size, uint16_t seq);
 
 #ifdef __cplusplus
 }

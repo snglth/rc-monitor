@@ -334,6 +334,92 @@ int rcm_feed(rcm_parser_t *p, const uint8_t *data, size_t len) {
     return decoded;
 }
 
+/* ---------- Packet builder ---------- */
+
+static inline void write_u16_le(uint8_t *p, uint16_t v) {
+    p[0] = (uint8_t)(v & 0xFF);
+    p[1] = (uint8_t)((v >> 8) & 0xFF);
+}
+
+int rcm_build_packet(uint8_t *out, size_t out_size,
+                     uint8_t sender_type, uint8_t sender_index,
+                     uint8_t receiver_type, uint8_t receiver_index,
+                     uint16_t seq_num,
+                     uint8_t pack_type, uint8_t ack_type, uint8_t encrypt_type,
+                     uint8_t cmd_set, uint8_t cmd_id,
+                     const uint8_t *payload, size_t payload_len) {
+    size_t total = DUML_HEADER_LEN + payload_len + DUML_FOOTER_LEN;
+    if (!out || total > out_size || total > DUML_MAX_FRAME_LEN)
+        return -1;
+
+    memset(out, 0, total);
+
+    /* [0] SOF */
+    out[0] = DUML_SOF;
+
+    /* [1-2] ver_length_tag: bits 0-9 = length, bits 10-15 = version */
+    uint16_t ver_len = ((uint16_t)total & 0x03FF) | ((uint16_t)DUML_VERSION << 10);
+    write_u16_le(out + 1, ver_len);
+
+    /* [3] CRC8 of bytes 0-2 */
+    out[3] = duml_crc8(out, 3);
+
+    /* [4] sender_info: bits 0-4 = sender_type, bits 5-7 = sender_index */
+    out[4] = (sender_type & 0x1F) | ((sender_index & 0x07) << 5);
+
+    /* [5] receiver_info: bits 0-4 = receiver_type, bits 5-7 = receiver_index */
+    out[5] = (receiver_type & 0x1F) | ((receiver_index & 0x07) << 5);
+
+    /* [6-7] seq_num (LE) */
+    write_u16_le(out + 6, seq_num);
+
+    /* [8] cmd_type_data: bit 7 = pack_type, bits 5-6 = ack_type, bits 0-2 = encrypt */
+    out[8] = ((pack_type & 0x01) << 7) | ((ack_type & 0x03) << 5) | (encrypt_type & 0x07);
+
+    /* [9] cmd_set */
+    out[9] = cmd_set;
+
+    /* [10] cmd_id */
+    out[10] = cmd_id;
+
+    /* [11..] payload */
+    if (payload_len > 0 && payload)
+        memcpy(out + DUML_HEADER_LEN, payload, payload_len);
+
+    /* CRC16 of all preceding bytes */
+    uint16_t crc = duml_crc16(out, total - DUML_FOOTER_LEN);
+    write_u16_le(out + total - DUML_FOOTER_LEN, crc);
+
+    return (int)total;
+}
+
+int rcm_build_enable_cmd(uint8_t *out, size_t out_size, uint16_t seq) {
+    uint8_t payload[] = { 0x01 };
+    return rcm_build_packet(out, out_size,
+                            DUML_DEV_PC, 0,    /* sender */
+                            DUML_DEV_RC, 0,    /* receiver */
+                            seq,
+                            DUML_PACK_REQUEST,
+                            DUML_ACK_AFTER_EXEC,
+                            0,                 /* no encryption */
+                            DUML_CMD_SET_RC,
+                            DUML_CMD_RC_ENABLE,
+                            payload, sizeof(payload));
+}
+
+int rcm_build_channel_request(uint8_t *out, size_t out_size, uint16_t seq) {
+    return rcm_build_packet(out, out_size,
+                            DUML_DEV_PC, 0,    /* sender */
+                            DUML_DEV_RC, 0,    /* receiver */
+                            seq,
+                            DUML_PACK_REQUEST,
+                            DUML_ACK_AFTER_EXEC,
+                            0,                 /* no encryption */
+                            DUML_CMD_SET_RC,
+                            DUML_CMD_RC_CHANNEL,
+                            NULL, 0);
+}
+
 /* ---------- Utility ---------- */
 
 const char *rcm_flight_mode_str(rc_flight_mode_t mode) {
