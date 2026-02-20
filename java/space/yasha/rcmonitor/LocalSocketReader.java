@@ -1,4 +1,4 @@
-package com.dji.rcmonitor;
+package space.yasha.rcmonitor;
 
 import android.content.Context;
 import android.net.LocalSocket;

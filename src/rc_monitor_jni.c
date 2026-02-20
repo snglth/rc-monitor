@@ -94,12 +94,12 @@ static void jni_rc_callback(const rc_state_t *state, void *userdata) {
 }
 
 /*
- * Class:     com_dji_rcmonitor_RcMonitor
+ * Class:     space_yasha_rcmonitor_RcMonitor
  * Method:    nativeInit
- * Signature: (Lcom/dji/rcmonitor/RcMonitor$RcStateListener;)Z
+ * Signature: (Lspace/yasha/rcmonitor/RcMonitor$RcStateListener;)Z
  */
 JNIEXPORT jboolean JNICALL
-Java_com_dji_rcmonitor_RcMonitor_nativeInit(JNIEnv *env, jobject thiz, jobject listener) {
+Java_space_yasha_rcmonitor_RcMonitor_nativeInit(JNIEnv *env, jobject thiz, jobject listener) {
     if (g_ctx) {
         LOGE("Already initialized");
         return JNI_FALSE;
@@ -139,12 +139,12 @@ Java_com_dji_rcmonitor_RcMonitor_nativeInit(JNIEnv *env, jobject thiz, jobject l
 }
 
 /*
- * Class:     com_dji_rcmonitor_RcMonitor
+ * Class:     space_yasha_rcmonitor_RcMonitor
  * Method:    nativeFeed
  * Signature: ([BI)I
  */
 JNIEXPORT jint JNICALL
-Java_com_dji_rcmonitor_RcMonitor_nativeFeed(JNIEnv *env, jobject thiz,
+Java_space_yasha_rcmonitor_RcMonitor_nativeFeed(JNIEnv *env, jobject thiz,
                                              jbyteArray data, jint length) {
     if (!g_ctx || !g_ctx->parser) return 0;
     if (!data || length <= 0) return 0;
@@ -162,7 +162,7 @@ Java_com_dji_rcmonitor_RcMonitor_nativeFeed(JNIEnv *env, jobject thiz,
 }
 
 /*
- * Class:     com_dji_rcmonitor_RcMonitor
+ * Class:     space_yasha_rcmonitor_RcMonitor
  * Method:    nativeFeedDirect
  * Signature: ([BI)I
  *
@@ -170,7 +170,7 @@ Java_com_dji_rcmonitor_RcMonitor_nativeFeed(JNIEnv *env, jobject thiz,
  * Use this if you already extract the RC push payload elsewhere.
  */
 JNIEXPORT jint JNICALL
-Java_com_dji_rcmonitor_RcMonitor_nativeFeedDirect(JNIEnv *env, jobject thiz,
+Java_space_yasha_rcmonitor_RcMonitor_nativeFeedDirect(JNIEnv *env, jobject thiz,
                                                     jbyteArray payload, jint length) {
     if (!g_ctx) return -1;
     if (!payload || length <= 0) return -1;
@@ -194,23 +194,23 @@ Java_com_dji_rcmonitor_RcMonitor_nativeFeedDirect(JNIEnv *env, jobject thiz,
 }
 
 /*
- * Class:     com_dji_rcmonitor_RcMonitor
+ * Class:     space_yasha_rcmonitor_RcMonitor
  * Method:    nativeReset
  * Signature: ()V
  */
 JNIEXPORT void JNICALL
-Java_com_dji_rcmonitor_RcMonitor_nativeReset(JNIEnv *env, jobject thiz) {
+Java_space_yasha_rcmonitor_RcMonitor_nativeReset(JNIEnv *env, jobject thiz) {
     if (g_ctx && g_ctx->parser)
         rcm_reset(g_ctx->parser);
 }
 
 /*
- * Class:     com_dji_rcmonitor_RcMonitor
+ * Class:     space_yasha_rcmonitor_RcMonitor
  * Method:    nativeDestroy
  * Signature: ()V
  */
 JNIEXPORT void JNICALL
-Java_com_dji_rcmonitor_RcMonitor_nativeDestroy(JNIEnv *env, jobject thiz) {
+Java_space_yasha_rcmonitor_RcMonitor_nativeDestroy(JNIEnv *env, jobject thiz) {
     if (!g_ctx) return;
 
     rcm_destroy(g_ctx->parser);
@@ -224,14 +224,14 @@ Java_com_dji_rcmonitor_RcMonitor_nativeDestroy(JNIEnv *env, jobject thiz) {
 }
 
 /*
- * Class:     com_dji_rcmonitor_RcMonitor
+ * Class:     space_yasha_rcmonitor_RcMonitor
  * Method:    nativeBuildEnableCmd
  * Signature: (I)[B
  *
  * Build a DUML enable command packet. Does not require the parser to be initialized.
  */
 JNIEXPORT jbyteArray JNICALL
-Java_com_dji_rcmonitor_RcMonitor_nativeBuildEnableCmd(JNIEnv *env, jclass clazz, jint seq) {
+Java_space_yasha_rcmonitor_RcMonitor_nativeBuildEnableCmd(JNIEnv *env, jclass clazz, jint seq) {
     uint8_t buf[DUML_MAX_FRAME_LEN];
     int len = rcm_build_enable_cmd(buf, sizeof(buf), (uint16_t)seq);
     if (len < 0) return NULL;
@@ -243,14 +243,14 @@ Java_com_dji_rcmonitor_RcMonitor_nativeBuildEnableCmd(JNIEnv *env, jclass clazz,
 }
 
 /*
- * Class:     com_dji_rcmonitor_RcMonitor
+ * Class:     space_yasha_rcmonitor_RcMonitor
  * Method:    nativeBuildChannelRequest
  * Signature: (I)[B
  *
  * Build a DUML channel data request packet. Does not require the parser to be initialized.
  */
 JNIEXPORT jbyteArray JNICALL
-Java_com_dji_rcmonitor_RcMonitor_nativeBuildChannelRequest(JNIEnv *env, jclass clazz, jint seq) {
+Java_space_yasha_rcmonitor_RcMonitor_nativeBuildChannelRequest(JNIEnv *env, jclass clazz, jint seq) {
     uint8_t buf[DUML_MAX_FRAME_LEN];
     int len = rcm_build_channel_request(buf, sizeof(buf), (uint16_t)seq);
     if (len < 0) return NULL;

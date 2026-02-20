@@ -1,4 +1,4 @@
-package com.dji.rcmonitor;
+package space.yasha.rcmonitor;
 
 /**
  * DJI RM510 RC Monitor - reads raw USB data from DJI remote controller

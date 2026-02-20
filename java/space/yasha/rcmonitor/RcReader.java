@@ -1,4 +1,4 @@
-package com.dji.rcmonitor;
+package space.yasha.rcmonitor;
 
 /**
  * Abstraction for RC data sources. Implementations read raw DUML frames
