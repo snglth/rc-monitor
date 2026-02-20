@@ -26,6 +26,7 @@ public class LocalSocketReader implements RcReader {
 
     private volatile boolean running;
     private Thread readThread;
+    private volatile LocalSocket activeSocket;
 
     /**
      * @param context   Android context
@@ -82,6 +83,7 @@ public class LocalSocketReader implements RcReader {
         }
 
         running = true;
+        activeSocket = socket;
         final LocalSocket fSocket = socket;
 
         readThread = new Thread(() -> {
@@ -106,6 +108,7 @@ public class LocalSocketReader implements RcReader {
             } finally {
                 monitor.destroy();
                 try { fSocket.close(); } catch (Exception ignored) {}
+                activeSocket = null;
                 running = false;
                 Log.d(TAG, "LocalSocket read loop stopped");
             }
@@ -119,6 +122,11 @@ public class LocalSocketReader implements RcReader {
     @Override
     public void stop() {
         running = false;
+        /* Close socket to unblock any pending read */
+        LocalSocket socket = activeSocket;
+        if (socket != null) {
+            try { socket.close(); } catch (Exception ignored) {}
+        }
         if (readThread != null) {
             try {
                 readThread.join(2000);

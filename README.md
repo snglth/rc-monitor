@@ -62,7 +62,7 @@ rc-monitor/
   emulator/
     rc_emulator.c                Interactive ncurses RC emulator
   test/
-    test_rc_monitor.c            Unit tests (32 tests)
+    test_rc_monitor.c            Unit tests (62 tests)
     verify_recording.c           Recording round-trip verifier
     fuzz_feed.c                  libFuzzer harness for rcm_feed()
     fuzz_payload.c               libFuzzer harness for rcm_parse_payload()

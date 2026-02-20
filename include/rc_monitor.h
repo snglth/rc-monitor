@@ -27,7 +27,7 @@ extern "C" {
 #define DUML_VERSION          1
 #define DUML_HEADER_LEN       11
 #define DUML_FOOTER_LEN       2
-#define DUML_MIN_FRAME_LEN    13    /* SOF(1)+LenVer(2)+CRC8(1)+Route(3)+Cmd(2)+Type(1)+CRC16(2)+payload(1+) */
+#define DUML_MIN_FRAME_LEN    13    /* SOF(1)+LenVer(2)+CRC8(1)+Sender(1)+Receiver(1)+Seq(2)+CmdType(1)+CmdSet(1)+CmdId(1)+CRC16(2) */
 #define DUML_MAX_FRAME_LEN    1400
 
 #define RC_PUSH_PAYLOAD_LEN   17
@@ -141,7 +141,8 @@ void rcm_destroy(rcm_parser_t *p);
 /*
  * Feed raw bytes from a USB bulk read into the parser.
  * May invoke the callback zero or more times synchronously.
- * Thread-safe: can be called from the USB read thread.
+ * Not internally synchronized — safe to call from any single thread
+ * (e.g. the USB read thread), but concurrent calls require external locking.
  *
  * @param p    Parser handle
  * @param data Raw bytes from USB bulk transfer

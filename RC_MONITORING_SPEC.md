@@ -343,10 +343,10 @@ Offset  Size  Field
 0       1     SOF (0x55)
 1-2     2     Length (including header, 10-bit) + version (6-bit)
 3       1     CRC8 of bytes 0-2
-4       1     Sender/Receiver IDs (packed)
-5-6     2     Sequence Number
-7       1     Command Type + ACK flag
-8       1     Encryption + Padding
+4       1     Sender: type (5-bit) + index (3-bit)
+5       1     Receiver: type (5-bit) + index (3-bit)
+6-7     2     Sequence Number (LE)
+8       1     pack_type (1-bit) + ack_type (2-bit) + encrypt (3-bit) + padding (2-bit)
 9       1     cmd_set
 10      1     cmd_id
 11..N-2        Payload

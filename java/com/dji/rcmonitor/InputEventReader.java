@@ -60,6 +60,7 @@ public class InputEventReader implements RcReader {
 
     private volatile boolean running;
     private Thread readThread;
+    private volatile FileInputStream activeStream;
 
     /* Running stick state, updated on each EV_ABS event */
     private int stickRightH;
@@ -121,6 +122,7 @@ public class InputEventReader implements RcReader {
         readThread = new Thread(() -> {
             Log.d(TAG, "Input event read loop started: " + devicePath);
             try (FileInputStream fis = new FileInputStream(devicePath)) {
+                activeStream = fis;
                 byte[] eventBuf = new byte[INPUT_EVENT_SIZE];
                 ByteBuffer bb = ByteBuffer.wrap(eventBuf).order(ByteOrder.LITTLE_ENDIAN);
 
@@ -162,6 +164,7 @@ public class InputEventReader implements RcReader {
                     Log.e(TAG, "Read error: " + e.getMessage());
                 }
             } finally {
+                activeStream = null;
                 monitor.destroy();
                 running = false;
                 Log.d(TAG, "Input event read loop stopped");
@@ -176,6 +179,11 @@ public class InputEventReader implements RcReader {
     @Override
     public void stop() {
         running = false;
+        /* Close stream to unblock any pending read */
+        FileInputStream stream = activeStream;
+        if (stream != null) {
+            try { stream.close(); } catch (Exception ignored) {}
+        }
         if (readThread != null) {
             try {
                 readThread.join(2000);

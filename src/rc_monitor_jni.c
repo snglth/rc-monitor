@@ -147,6 +147,10 @@ JNIEXPORT jint JNICALL
 Java_com_dji_rcmonitor_RcMonitor_nativeFeed(JNIEnv *env, jobject thiz,
                                              jbyteArray data, jint length) {
     if (!g_ctx || !g_ctx->parser) return 0;
+    if (!data || length <= 0) return 0;
+
+    jint arrLen = (*env)->GetArrayLength(env, data);
+    if (length > arrLen) length = arrLen;
 
     jbyte *buf = (*env)->GetByteArrayElements(env, data, NULL);
     if (!buf) return 0;
@@ -169,6 +173,10 @@ JNIEXPORT jint JNICALL
 Java_com_dji_rcmonitor_RcMonitor_nativeFeedDirect(JNIEnv *env, jobject thiz,
                                                     jbyteArray payload, jint length) {
     if (!g_ctx) return -1;
+    if (!payload || length <= 0) return -1;
+
+    jint arrLen = (*env)->GetArrayLength(env, payload);
+    if (length > arrLen) length = arrLen;
 
     jbyte *buf = (*env)->GetByteArrayElements(env, payload, NULL);
     if (!buf) return -1;

@@ -127,11 +127,10 @@ int rcm_parse_payload(const uint8_t *payload, size_t len, rc_state_t *out) {
 
     /*
      * Right wheel delta: 5-bit magnitude (bits 5:1) with sign bit (bit 6).
-     * Reverse-engineered convention: sign=1 → positive, sign=0 → negative.
-     * This is the opposite of the typical sign-bit convention. The Ghidra
-     * decompilation of UpdateRightWheel only covers wheel position (value -
-     * 0x400), not this delta encoding, so the sign polarity has not been
-     * independently verified against hardware.
+     * Convention: sign=1 → positive, sign=0 → negative.
+     * Verified against Ghidra decompilation of OnButtonPhysicalStatusPush
+     * @ 0x028576a8: (uVar15 & 0x4000000000)==0 → iVar4=-1, else iVar4=1;
+     * result = (bVar5>>1 & 0x1f) * iVar4.
      */
     int mag  = (b4 >> 1) & 0x1F;
     int sign = (b4 >> 6) & 1;
@@ -271,10 +270,10 @@ static int try_decode_frame(rcm_parser_t *p) {
              *   [0]     SOF
              *   [1-2]   length(10) + version(6)
              *   [3]     CRC8
-             *   [4]     sender(3) + receiver(5)   -- varies by version
-             *   [5-6]   sequence number
-             *   [7]     cmd type + ack
-             *   [8]     encryption + padding
+             *   [4]     sender_type(5) + sender_index(3)
+             *   [5]     receiver_type(5) + receiver_index(3)
+             *   [6-7]   sequence number (LE)
+             *   [8]     pack_type(1) + ack_type(2) + encrypt(3) + padding(2)
              *   [9]     cmd_set
              *   [10]    cmd_id
              *   [11..]  payload
@@ -355,8 +354,12 @@ int rcm_build_packet(uint8_t *out, size_t out_size,
                      uint8_t pack_type, uint8_t ack_type, uint8_t encrypt_type,
                      uint8_t cmd_set, uint8_t cmd_id,
                      const uint8_t *payload, size_t payload_len) {
+    if (!out || payload_len > DUML_MAX_FRAME_LEN)
+        return -1;
     size_t total = DUML_HEADER_LEN + payload_len + DUML_FOOTER_LEN;
-    if (!out || total > out_size || total > DUML_MAX_FRAME_LEN)
+    if (total > out_size || total > DUML_MAX_FRAME_LEN)
+        return -1;
+    if (payload_len > 0 && !payload)
         return -1;
 
     memset(out, 0, total);
@@ -390,7 +393,7 @@ int rcm_build_packet(uint8_t *out, size_t out_size,
     out[10] = cmd_id;
 
     /* [11..] payload */
-    if (payload_len > 0 && payload)
+    if (payload_len > 0)
         memcpy(out + DUML_HEADER_LEN, payload, payload_len);
 
     /* CRC16 of all preceding bytes */

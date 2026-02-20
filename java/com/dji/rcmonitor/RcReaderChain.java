@@ -38,6 +38,10 @@ public class RcReaderChain {
      * @return the active reader, or null if none could start
      */
     public RcReader start(RcMonitor.RcStateListener listener) {
+        if (active != null) {
+            active.stop();
+            active = null;
+        }
         for (RcReader reader : readers) {
             String name = reader.getName();
             if (!reader.isAvailable()) {
