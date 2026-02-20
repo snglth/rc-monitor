@@ -158,16 +158,20 @@ public class DussStreamReader implements RcReader {
         UsbManager usbManager = (UsbManager) context.getSystemService(Context.USB_SERVICE);
         if (usbManager == null) return null;
 
+        UsbDevice fallback = null;
         for (UsbDevice device : usbManager.getDeviceList().values()) {
             if (device.getVendorId() == RcMonitor.DJI_USB_VID) {
                 int pid = device.getProductId();
+                if (pid == RcMonitor.DJI_USB_PID_INTERNAL) {
+                    return device; /* prefer internal pigeon device */
+                }
                 if (pid == RcMonitor.DJI_USB_PID_ACTIVE ||
                     pid == RcMonitor.DJI_USB_PID_INIT) {
-                    return device;
+                    fallback = device;
                 }
             }
         }
-        return null;
+        return fallback;
     }
 
     private static UsbEndpoint findBulkIn(UsbInterface iface) {

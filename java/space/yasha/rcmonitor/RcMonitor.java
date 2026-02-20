@@ -212,4 +212,6 @@ public class RcMonitor {
     public static final int DJI_USB_VID = 0x2CA3;
     public static final int DJI_USB_PID_INIT = 0x0040;
     public static final int DJI_USB_PID_ACTIVE = 0x1020;
+    /** Internal "pigeon" controller on RM510B — the RC hardware on the device itself */
+    public static final int DJI_USB_PID_INTERNAL = 0x001F;
 }
