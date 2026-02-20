@@ -20,6 +20,21 @@ test_rc_monitor
 rc_emulator
 verify_recording
 
+# Fuzz targets and artifacts
+fuzz_feed
+fuzz_payload
+fuzz_build_packet
+gen_corpus
+corpus_feed/
+corpus_payload/
+crash-*
+leak-*
+timeout-*
+oom-*
+slow-unit-*
+default.profraw
+default.profdata
+
 # macOS
 .DS_Store
 

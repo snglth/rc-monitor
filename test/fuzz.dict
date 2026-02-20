@@ -1,0 +1,29 @@
+# DUML protocol dictionary for libFuzzer
+# Protocol-specific tokens to guide mutations
+
+# Start of frame
+sof="\x55"
+
+# Command pairs (cmd_set + cmd_id)
+cmd_pair_push="\x06\x05"
+cmd_pair_enable="\x06\x24"
+cmd_pair_channel="\x06\x01"
+
+# Length + version fields (little-endian length with version nibble)
+len_ver_30="\x1e\x04"
+len_ver_13="\x0d\x04"
+
+# Stick values (uint16 LE)
+stick_center="\x00\x04"
+stick_max="\xff\x07"
+stick_overflow="\xff\xff"
+
+# Button bytes
+all_buttons="\x70\xf9\x1d"
+
+# Wheel delta byte values
+wheel_delta_max_pos="\x7e"
+wheel_delta_max_neg="\x3e"
+
+# SOF + length/version for RC push frame
+sof_len_push="\x55\x1e\x04"

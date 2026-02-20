@@ -75,14 +75,75 @@ else()
     # Fuzz targets (requires clang with libFuzzer support)
     option(ENABLE_FUZZING "Enable libFuzzer targets" OFF)
     if(ENABLE_FUZZING)
+        # Separate instrumented library for fuzz targets (coverage + sanitizers)
+        # so the regular rc_monitor_static stays clean for test_rc_monitor et al.
+        add_library(rc_monitor_fuzz STATIC ${SOURCES})
+        target_include_directories(rc_monitor_fuzz PUBLIC include)
+        target_compile_options(rc_monitor_fuzz PRIVATE
+            -fsanitize=fuzzer-no-link,address,undefined -fno-omit-frame-pointer)
+
+        # fuzz_feed — DUML frame parser fuzzer
         add_executable(fuzz_feed test/fuzz_feed.c)
-        target_link_libraries(fuzz_feed rc_monitor_static)
+        target_link_libraries(fuzz_feed rc_monitor_fuzz)
         target_compile_options(fuzz_feed PRIVATE -fsanitize=fuzzer,address,undefined)
         target_link_options(fuzz_feed PRIVATE -fsanitize=fuzzer,address,undefined)
 
+        # fuzz_payload — payload decoder fuzzer
         add_executable(fuzz_payload test/fuzz_payload.c)
-        target_link_libraries(fuzz_payload rc_monitor_static)
+        target_link_libraries(fuzz_payload rc_monitor_fuzz)
         target_compile_options(fuzz_payload PRIVATE -fsanitize=fuzzer,address,undefined)
         target_link_options(fuzz_payload PRIVATE -fsanitize=fuzzer,address,undefined)
+
+        # fuzz_build_packet — round-trip builder+parser fuzzer
+        add_executable(fuzz_build_packet test/fuzz_build_packet.c)
+        target_link_libraries(fuzz_build_packet rc_monitor_fuzz)
+        target_compile_options(fuzz_build_packet PRIVATE -fsanitize=fuzzer,address,undefined)
+        target_link_options(fuzz_build_packet PRIVATE -fsanitize=fuzzer,address,undefined)
+
+        # gen_corpus — seed corpus generator (not a fuzzer, just a tool)
+        add_executable(gen_corpus test/gen_corpus.c)
+        target_link_libraries(gen_corpus rc_monitor_fuzz)
+        target_compile_options(gen_corpus PRIVATE -fsanitize=address,undefined)
+        target_link_options(gen_corpus PRIVATE -fsanitize=address,undefined)
+
+        # Convenience target: generate seed corpus
+        add_custom_target(gen-corpus
+            COMMAND gen_corpus
+                ${CMAKE_BINARY_DIR}/corpus_feed
+                ${CMAKE_BINARY_DIR}/corpus_payload
+            DEPENDS gen_corpus
+            COMMENT "Generating seed corpus for fuzzers"
+        )
+
+        # Convenience targets: run fuzzers with tuned flags
+        add_custom_target(fuzz-feed
+            COMMAND fuzz_feed
+                ${CMAKE_BINARY_DIR}/corpus_feed
+                -dict=${CMAKE_SOURCE_DIR}/test/fuzz.dict
+                -max_len=8192
+                -max_total_time=300
+            DEPENDS fuzz_feed gen-corpus
+            COMMENT "Running fuzz_feed"
+        )
+
+        add_custom_target(fuzz-payload
+            COMMAND fuzz_payload
+                ${CMAKE_BINARY_DIR}/corpus_payload
+                -dict=${CMAKE_SOURCE_DIR}/test/fuzz.dict
+                -max_len=32
+                -max_total_time=300
+            DEPENDS fuzz_payload gen-corpus
+            COMMENT "Running fuzz_payload"
+        )
+
+        add_custom_target(fuzz-build-packet
+            COMMAND fuzz_build_packet
+                ${CMAKE_BINARY_DIR}/corpus_feed
+                -dict=${CMAKE_SOURCE_DIR}/test/fuzz.dict
+                -max_len=1450
+                -max_total_time=300
+            DEPENDS fuzz_build_packet gen-corpus
+            COMMENT "Running fuzz_build_packet"
+        )
     endif()
 endif()
