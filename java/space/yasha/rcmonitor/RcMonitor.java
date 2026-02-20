@@ -212,6 +212,41 @@ public class RcMonitor {
     public static final int DJI_USB_VID = 0x2CA3;
     public static final int DJI_USB_PID_INIT = 0x0040;
     public static final int DJI_USB_PID_ACTIVE = 0x1020;
-    /** Internal "pigeon" controller on RM510B — the RC hardware on the device itself */
+    /**
+     * Internal USB PID for the RM510B's on-device RC hardware ("pigeon"
+     * subsystem).  Confirmed via {@code lsusb} enumeration on an RM510B
+     * and corroborated by {@code #VID_2CA3&PID_001F&MI_03/MI_04} instance
+     * ID strings in {@code libdjisdk_jni.so}.
+     *
+     * <p>This device exposes only interfaces MI_03 and MI_04 — fewer than the
+     * external RC PIDs (0x0040 / 0x1020).  Readers that assume a specific
+     * interface index (e.g. {@link DussStreamReader} targeting index 7)
+     * should verify the interface exists before claiming it.</p>
+     */
     public static final int DJI_USB_PID_INTERNAL = 0x001F;
+
+    /**
+     * Find the first connected DJI USB device, preferring the internal
+     * pigeon device (PID 0x001F) over external RC PIDs.
+     *
+     * @param usbManager a non-null {@link android.hardware.usb.UsbManager}
+     * @return the best-match {@link android.hardware.usb.UsbDevice}, or null
+     */
+    public static android.hardware.usb.UsbDevice findDjiDevice(
+            android.hardware.usb.UsbManager usbManager) {
+        if (usbManager == null) return null;
+        android.hardware.usb.UsbDevice fallback = null;
+        for (android.hardware.usb.UsbDevice device : usbManager.getDeviceList().values()) {
+            if (device.getVendorId() == DJI_USB_VID) {
+                int pid = device.getProductId();
+                if (pid == DJI_USB_PID_INTERNAL) {
+                    return device;
+                }
+                if (pid == DJI_USB_PID_ACTIVE || pid == DJI_USB_PID_INIT) {
+                    fallback = device;
+                }
+            }
+        }
+        return fallback;
+    }
 }

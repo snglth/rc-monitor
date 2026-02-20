@@ -62,7 +62,7 @@ Singleton `jni_ctx_t` holds the parser, JavaVM reference, listener global ref, a
 
 ### Java Layer (`java/com/dji/rcmonitor/`)
 
-- **RcMonitor.java**: Wraps native methods. `SimpleListener` adapter packs the 20 callback parameters into an `RcState` object for convenience.
+- **RcMonitor.java**: Wraps native methods. `SimpleListener` adapter packs the 20 callback parameters into an `RcState` object for convenience. Static `findDjiDevice(UsbManager)` centralises DJI USB device discovery (prefers PID_INTERNAL over PID_ACTIVE/PID_INIT).
 - **RcReader.java**: Interface (`getName`, `start`, `stop`, `isRunning`, `isAvailable`) implemented by all readers below.
 - **UsbRcReader.java**: Full USB lifecycle — device discovery by VID/PID, CDC ACM setup (115200 8N1, DTR+RTS), DUML handshake (enable cmd), background read loop with automatic fallback to polling if push data stops after 2 seconds. Implements `RcReader`.
 - **DussStreamReader.java**: Opens USB Interface 7 (DUSS stream on RM510B), reads bulk IN into `RcMonitor.feed()`. Periodic hex logging to logcat. No handshake required.
@@ -91,8 +91,9 @@ Feeds a `.bin` file of raw DUML frames back through `rcm_feed()` and prints each
 | `DUML_CMD_RC_PUSH` | 0x05 | RC push packet |
 | `RC_PUSH_PAYLOAD_LEN` | 17 | Expected payload size |
 | `DJI_USB_VID` | 0x2CA3 | DJI vendor ID |
-| `DJI_USB_PID_INIT` | 0x0040 | Initial USB PID |
-| `DJI_USB_PID_ACTIVE` | 0x1020 | Active USB PID |
+| `DJI_USB_PID_INIT` | 0x0040 | Initial USB PID (external RC) |
+| `DJI_USB_PID_ACTIVE` | 0x1020 | Active USB PID (external RC) |
+| `DJI_USB_PID_INTERNAL` | 0x001F | RM510B on-device "pigeon" controller (MI_03, MI_04 only) |
 
 ## Payload Byte Layout (17 bytes)
 

@@ -61,27 +61,13 @@ public class UsbRcReader implements RcReader {
 
     /**
      * Find the first connected DJI USB device.
-     * Checks for both init-mode (PID 0x0040) and active-mode (PID 0x1020) PIDs.
+     * Delegates to {@link RcMonitor#findDjiDevice(UsbManager)} which prefers
+     * the internal pigeon PID (0x001F) over external RC PIDs (0x0040 / 0x1020).
      * @return UsbDevice or null if not found
      */
     public UsbDevice findDjiDevice() {
         UsbManager usbManager = (UsbManager) context.getSystemService(Context.USB_SERVICE);
-        if (usbManager == null) return null;
-
-        UsbDevice fallback = null;
-        for (UsbDevice device : usbManager.getDeviceList().values()) {
-            if (device.getVendorId() == RcMonitor.DJI_USB_VID) {
-                int pid = device.getProductId();
-                if (pid == RcMonitor.DJI_USB_PID_INTERNAL) {
-                    return device; /* prefer internal pigeon device */
-                }
-                if (pid == RcMonitor.DJI_USB_PID_ACTIVE ||
-                    pid == RcMonitor.DJI_USB_PID_INIT) {
-                    fallback = device;
-                }
-            }
-        }
-        return fallback;
+        return RcMonitor.findDjiDevice(usbManager);
     }
 
     /**

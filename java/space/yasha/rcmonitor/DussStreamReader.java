@@ -154,24 +154,17 @@ public class DussStreamReader implements RcReader {
         return running;
     }
 
+    /**
+     * Find the first connected DJI USB device.
+     * Delegates to {@link RcMonitor#findDjiDevice(UsbManager)}.
+     *
+     * <p><b>Note:</b> PID 0x001F (internal pigeon) exposes only MI_03/MI_04,
+     * so the DUSS Interface 7 assumption may not hold.  The caller's
+     * {@link #isAvailable()} checks the interface count before proceeding.</p>
+     */
     private UsbDevice findDjiDevice() {
         UsbManager usbManager = (UsbManager) context.getSystemService(Context.USB_SERVICE);
-        if (usbManager == null) return null;
-
-        UsbDevice fallback = null;
-        for (UsbDevice device : usbManager.getDeviceList().values()) {
-            if (device.getVendorId() == RcMonitor.DJI_USB_VID) {
-                int pid = device.getProductId();
-                if (pid == RcMonitor.DJI_USB_PID_INTERNAL) {
-                    return device; /* prefer internal pigeon device */
-                }
-                if (pid == RcMonitor.DJI_USB_PID_ACTIVE ||
-                    pid == RcMonitor.DJI_USB_PID_INIT) {
-                    fallback = device;
-                }
-            }
-        }
-        return fallback;
+        return RcMonitor.findDjiDevice(usbManager);
     }
 
     private static UsbEndpoint findBulkIn(UsbInterface iface) {
