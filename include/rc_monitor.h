@@ -55,6 +55,7 @@ extern "C" {
 #define DJI_USB_VID           0x2CA3
 #define DJI_USB_PID_INIT      0x0040
 #define DJI_USB_PID_ACTIVE    0x1020
+#define DJI_USB_PID_INTERNAL  0x001F  /* RM510B on-device "pigeon" controller (MI_03, MI_04) */
 
 /* --- RC State Structures --- */
 
